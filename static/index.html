@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SkinNN</title>
+  <style>
+    :root {
+      --bg: #e8f0ec;
+      --bg-deep: #d5e4db;
+      --ink: #1c2e28;
+      --muted: #4a635a;
+      --accent: #2a7a6a;
+      --accent-dark: #1f5c50;
+      --panel: #f7fbf8;
+      --line: #b7cdc3;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse at top left, #f2f8f4 0%, transparent 55%),
+        linear-gradient(160deg, var(--bg), var(--bg-deep));
+    }
+
+    main {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 3rem 1.25rem 4rem;
+    }
+
+    h1 {
+      margin: 0 0 0.35rem;
+      font-size: clamp(2.4rem, 6vw, 3.2rem);
+      letter-spacing: -0.03em;
+      color: var(--accent-dark);
+    }
+
+    .tagline {
+      margin: 0 0 2rem;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.45;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+
+    label.file {
+      display: block;
+      cursor: pointer;
+      border: 1.5px dashed var(--accent);
+      border-radius: 10px;
+      padding: 1.5rem 1rem;
+      text-align: center;
+      color: var(--muted);
+      background: #eef6f2;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    label.file:hover {
+      background: #e4f1eb;
+      border-color: var(--accent-dark);
+    }
+
+    label.file strong {
+      display: block;
+      color: var(--ink);
+      margin-bottom: 0.35rem;
+    }
+
+    input[type="file"] {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      overflow: hidden;
+    }
+
+    .preview {
+      display: none;
+      margin-top: 1rem;
+      max-width: 100%;
+      max-height: 280px;
+      border-radius: 8px;
+      object-fit: contain;
+    }
+
+    .actions {
+      margin-top: 1rem;
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    button {
+      appearance: none;
+      border: none;
+      border-radius: 8px;
+      padding: 0.7rem 1.2rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #fff;
+      background: var(--accent);
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled) {
+      background: var(--accent-dark);
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    #result {
+      display: none;
+      margin-top: 1.5rem;
+    }
+
+    #result h2 {
+      margin: 0 0 0.25rem;
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .prediction {
+      margin: 0 0 1.25rem;
+      font-size: clamp(1.5rem, 4vw, 1.9rem);
+      font-weight: 700;
+      color: var(--accent-dark);
+    }
+
+    .prediction span {
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .chances {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .chances li {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.55rem 0;
+      border-top: 1px solid var(--line);
+      font-size: 0.98rem;
+    }
+
+    .chances li:first-child {
+      border-top: none;
+      font-weight: 600;
+    }
+
+    .pct {
+      font-variant-numeric: tabular-nums;
+      color: var(--accent-dark);
+    }
+
+    footer {
+      margin-top: 2.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>SkinNN</h1>
+    <p class="tagline">Upload a dermoscopic lesion photo to see predicted class chances.</p>
+
+    <div class="panel">
+      <label class="file" for="photo">
+        <strong>Choose a photo</strong>
+        JPG or PNG works best
+      </label>
+      <input id="photo" type="file" accept="image/*" />
+      <img id="preview" class="preview" alt="Selected photo preview" />
+      <div class="actions">
+        <button id="analyze" type="button" disabled>Analyze</button>
+        <span id="status" class="status"></span>
+      </div>
+    </div>
+
+    <section id="result" aria-live="polite">
+      <h2>Predicted</h2>
+      <p class="prediction" id="prediction"></p>
+      <ul class="chances" id="chances"></ul>
+    </section>
+
+    <footer>
+      Prototype / not medical advice. SkinNN is for learning and demos only.
+      It does not diagnose cancer or any disease — talk to a clinician about skin concerns.
+    </footer>
+  </main>
+
+  <script>
+    const photo = document.getElementById("photo");
+    const preview = document.getElementById("preview");
+    const analyze = document.getElementById("analyze");
+    const status = document.getElementById("status");
+    const result = document.getElementById("result");
+    const prediction = document.getElementById("prediction");
+    const chances = document.getElementById("chances");
+
+    let selectedFile = null;
+
+    photo.addEventListener("change", () => {
+      selectedFile = photo.files[0] || null;
+      analyze.disabled = !selectedFile;
+      status.textContent = "";
+      result.style.display = "none";
+
+      if (!selectedFile) {
+        preview.style.display = "none";
+        preview.removeAttribute("src");
+        return;
+      }
+
+      preview.src = URL.createObjectURL(selectedFile);
+      preview.style.display = "block";
+    });
+
+    analyze.addEventListener("click", async () => {
+      if (!selectedFile) return;
+
+      analyze.disabled = true;
+      status.textContent = "Analyzing…";
+      result.style.display = "none";
+
+      const body = new FormData();
+      body.append("file", selectedFile);
+
+      try {
+        const res = await fetch("/predict", { method: "POST", body });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || "Prediction failed");
+        }
+
+        prediction.innerHTML =
+          data.class + ' <span>(' + data.confidence + '%)</span>';
+
+        const ranked = Object.entries(data.probabilities)
+          .sort((a, b) => b[1] - a[1]);
+
+        chances.innerHTML = ranked
+          .map(([name, pct]) =>
+            "<li><span>" + name + '</span><span class="pct">' + pct + "%</span></li>"
+          )
+          .join("");
+
+        result.style.display = "block";
+        status.textContent = "Done";
+      } catch (err) {
+        status.textContent = err.message || "Something went wrong";
+      } finally {
+        analyze.disabled = !selectedFile;
+      }
+    });
+  </script>
+</body>
+</html>

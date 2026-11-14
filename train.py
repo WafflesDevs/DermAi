@@ -1,0 +1,159 @@
+"""Train SkinCNN (ResNet18) on HAM10000 and save weights/best.pt."""
+
+from pathlib import Path
+
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, Subset, random_split
+from torchvision import transforms
+from torchvision.datasets import ImageFolder
+from torchvision.models import ResNet18_Weights, resnet18
+
+ROOT = Path(__file__).resolve().parent
+DATA = ROOT / "data" / "ham10000"
+WEIGHTS = ROOT / "weights" / "best.pt"
+SIZE = 224
+MEAN = (0.485, 0.456, 0.406)
+STD = (0.229, 0.224, 0.225)
+
+
+def pick_device():
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
+class LabeledImageFolder(ImageFolder):
+    def find_classes(self, directory):
+        classes, _ = super().find_classes(directory)
+        classes = [c for c in classes if c != "unlabeled"]
+        return classes, {name: i for i, name in enumerate(classes)}
+
+
+class SkinCNN(nn.Module):
+    def __init__(self, num_classes=7):
+        super().__init__()
+        self.backbone = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+        self.backbone.fc = nn.Sequential(
+            nn.Dropout(0.5),
+            nn.Linear(self.backbone.fc.in_features, num_classes),
+        )
+
+    def forward(self, x):
+        return self.backbone(x)
+
+
+def train(
+    data_dir=DATA,
+    epochs=100,
+    batch_size=16,
+    lr=1e-4,
+    weight_decay=1e-4,
+    patience=10,
+    save_path=WEIGHTS,
+):
+    dev = pick_device()
+    train_tf = transforms.Compose([
+        transforms.Resize((SIZE, SIZE)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        transforms.RandomRotation(15),
+        transforms.ColorJitter(0.2, 0.2, 0.2, 0.05),
+        transforms.ToTensor(),
+        transforms.Normalize(MEAN, STD),
+    ])
+    eval_tf = transforms.Compose([
+        transforms.Resize((SIZE, SIZE)),
+        transforms.ToTensor(),
+        transforms.Normalize(MEAN, STD),
+    ])
+
+    full = LabeledImageFolder(str(data_dir), transform=train_tf)
+    n_cls = len(full.class_to_idx)
+    n_val = max(1, int(len(full) * 0.2))
+    train_ds, val_split = random_split(
+        full,
+        [len(full) - n_val, n_val],
+        generator=torch.Generator().manual_seed(42),
+    )
+    val_ds = Subset(
+        LabeledImageFolder(str(data_dir), transform=eval_tf),
+        val_split.indices,
+    )
+
+    counts = torch.bincount(
+        torch.tensor([full.targets[i] for i in train_ds.indices]),
+        minlength=n_cls,
+    ).float()
+    class_weights = (counts.sum() / (counts.clamp(min=1) * n_cls)).to(dev)
+    crit = nn.CrossEntropyLoss(weight=class_weights)
+
+    model = SkinCNN(n_cls).to(dev)
+    opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_ds, batch_size=batch_size)
+
+    save_path = Path(save_path)
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    best, stale = float("inf"), 0
+    print(f"device={dev} classes={n_cls} train={len(train_ds)} val={n_val}")
+
+    for epoch in range(1, epochs + 1):
+        model.train()
+        tr_loss, tr_ok, n = 0.0, 0, 0
+        for x, y in train_loader:
+            x, y = x.to(dev), y.to(dev)
+            opt.zero_grad()
+            logits = model(x)
+            loss = crit(logits, y)
+            loss.backward()
+            opt.step()
+            tr_loss += loss.item() * x.size(0)
+            tr_ok += (logits.argmax(1) == y).sum().item()
+            n += x.size(0)
+        tr_loss /= n
+        tr_acc = tr_ok / n * 100
+
+        model.eval()
+        va_loss, va_ok, n = 0.0, 0, 0
+        with torch.no_grad():
+            for x, y in val_loader:
+                x, y = x.to(dev), y.to(dev)
+                logits = model(x)
+                va_loss += crit(logits, y).item() * x.size(0)
+                va_ok += (logits.argmax(1) == y).sum().item()
+                n += x.size(0)
+        va_loss /= n
+        va_acc = va_ok / n * 100
+
+        mark = ""
+        if va_loss < best:
+            best, stale, mark = va_loss, 0, " *"
+            torch.save(
+                {
+                    "model_state_dict": model.state_dict(),
+                    "class_to_idx": dict(full.class_to_idx),
+                    "num_classes": n_cls,
+                },
+                save_path,
+            )
+        else:
+            stale += 1
+
+        print(
+            f"epoch {epoch}/{epochs}  "
+            f"train_loss={tr_loss:.4f} train_acc={tr_acc:.1f}%  "
+            f"val_loss={va_loss:.4f} val_acc={va_acc:.1f}%{mark}"
+        )
+        if stale >= patience:
+            print(f"early stop (best={best:.4f})")
+            break
+
+    print(f"best val_loss={best:.4f} → {save_path}")
+    return save_path
+
+
+if __name__ == "__main__":
+    train()
