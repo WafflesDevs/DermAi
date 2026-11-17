@@ -3,7 +3,7 @@
 **Track:** Health  
 **Team:** Ayaan Ali (A Tech)
 
-Dermoscopic skin-lesion image classifier (7 HAM10000 classes) using a fine-tuned ResNet18, with a tiny FastAPI upload demo.
+Dermoscopic skin-lesion image classifier (7 HAM10000 classes) using a fine-tuned ResNet18
 
 > **Prototype / not medical advice.** SkinNN is a student hackathon prototype for learning and experimentation only. It is **not** a medical device, **not** a diagnosis, and **not** a substitute for a licensed clinician. Do not use it to make health decisions.
 
