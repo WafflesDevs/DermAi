@@ -45,9 +45,13 @@ class SkinCNN(nn.Module):
     def __init__(self, num_classes=7):
         super().__init__()
         self.backbone = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+        feats = self.backbone.fc.in_features
         self.backbone.fc = nn.Sequential(
-            nn.Dropout(0.5),
-            nn.Linear(self.backbone.fc.in_features, num_classes),
+            nn.Dropout(0.4),
+            nn.Linear(feats, 256),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(256, num_classes),
         )
 
     def forward(self, x):
@@ -81,6 +85,7 @@ def predict(image, weights_path=WEIGHTS):
         "confidence": float(probs[pred]),
         "probabilities": {idx_to_class[i]: float(probs[i]) for i in range(n)},
     }
+
 
 
 def as_percents(result):

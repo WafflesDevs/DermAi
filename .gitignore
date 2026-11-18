@@ -11,3 +11,8 @@ wheels/
 
 # Local model weights (large)
 weights/*.pt
+
+# Scratch / temp experiments
+temp.csv
+temp/
+model_weights.pth

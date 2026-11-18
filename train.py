@@ -36,9 +36,13 @@ class SkinCNN(nn.Module):
     def __init__(self, num_classes=7):
         super().__init__()
         self.backbone = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+        feats = self.backbone.fc.in_features
         self.backbone.fc = nn.Sequential(
-            nn.Dropout(0.5),
-            nn.Linear(self.backbone.fc.in_features, num_classes),
+            nn.Dropout(0.4),
+            nn.Linear(feats, 256),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(256, num_classes),
         )
 
     def forward(self, x):
@@ -59,8 +63,8 @@ def train(
         transforms.Resize((SIZE, SIZE)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
-        transforms.RandomRotation(15),
-        transforms.ColorJitter(0.2, 0.2, 0.2, 0.05),
+        transforms.RandomRotation(20),
+        transforms.ColorJitter(0.25, 0.25, 0.25, 0.05),
         transforms.ToTensor(),
         transforms.Normalize(MEAN, STD),
     ])
@@ -88,7 +92,7 @@ def train(
         minlength=n_cls,
     ).float()
     class_weights = (counts.sum() / (counts.clamp(min=1) * n_cls)).to(dev)
-    crit = nn.CrossEntropyLoss(weight=class_weights)
+    crit = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=0.05)
 
     model = SkinCNN(n_cls).to(dev)
     opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -97,7 +101,7 @@ def train(
 
     save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
-    best, stale = float("inf"), 0
+    best, stale = 0.0, 0
     print(f"device={dev} classes={n_cls} train={len(train_ds)} val={n_val}")
 
     for epoch in range(1, epochs + 1):
@@ -129,8 +133,8 @@ def train(
         va_acc = va_ok / n * 100
 
         mark = ""
-        if va_loss < best:
-            best, stale, mark = va_loss, 0, " *"
+        if va_acc > best:
+            best, stale, mark = va_acc, 0, " *"
             torch.save(
                 {
                     "model_state_dict": model.state_dict(),
@@ -148,10 +152,10 @@ def train(
             f"val_loss={va_loss:.4f} val_acc={va_acc:.1f}%{mark}"
         )
         if stale >= patience:
-            print(f"early stop (best={best:.4f})")
+            print(f"early stop (best_acc={best:.1f}%)")
             break
 
-    print(f"best val_loss={best:.4f} → {save_path}")
+    print(f"best val_acc={best:.1f}% → {save_path}")
     return save_path
 
 
