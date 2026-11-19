@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, Subset, random_split
+from torch.utils.data import DataLoader, Subset, WeightedRandomSampler, random_split
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
 from torchvision.models import ResNet18_Weights, resnet18
@@ -87,22 +87,29 @@ def train(
         val_split.indices,
     )
 
-    counts = torch.bincount(
-        torch.tensor([full.targets[i] for i in train_ds.indices]),
-        minlength=n_cls,
-    ).float()
+    train_labels = torch.tensor([full.targets[i] for i in train_ds.indices])
+    counts = torch.bincount(train_labels, minlength=n_cls).float()
     class_weights = (counts.sum() / (counts.clamp(min=1) * n_cls)).to(dev)
     crit = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=0.05)
 
+    # Oversample rare classes so batches aren't flooded by nevi.
+    sample_weights = (1.0 / counts.clamp(min=1))[train_labels]
+    sampler = WeightedRandomSampler(
+        weights=sample_weights,
+        num_samples=len(sample_weights),
+        replacement=True,
+    )
+
     model = SkinCNN(n_cls).to(dev)
     opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_ds, batch_size=batch_size, sampler=sampler)
     val_loader = DataLoader(val_ds, batch_size=batch_size)
 
     save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
     best, stale = 0.0, 0
     print(f"device={dev} classes={n_cls} train={len(train_ds)} val={n_val}")
+    print("class counts:", {name: int(counts[i]) for name, i in full.class_to_idx.items()})
 
     for epoch in range(1, epochs + 1):
         model.train()
@@ -140,9 +147,11 @@ def train(
                     "model_state_dict": model.state_dict(),
                     "class_to_idx": dict(full.class_to_idx),
                     "num_classes": n_cls,
+                    "best_acc": va_acc,
                 },
                 save_path,
             )
+            print(f"Best accuracy saved: {va_acc:.1f}%")
         else:
             stale += 1
 
@@ -151,6 +160,7 @@ def train(
             f"train_loss={tr_loss:.4f} train_acc={tr_acc:.1f}%  "
             f"val_loss={va_loss:.4f} val_acc={va_acc:.1f}%{mark}"
         )
+        print(f"Current saved accuracy: {best:.1f}%")
         if stale >= patience:
             print(f"early stop (best_acc={best:.1f}%)")
             break
