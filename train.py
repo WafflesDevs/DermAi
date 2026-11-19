@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, Subset, WeightedRandomSampler, random_split
+from torch.utils.data import DataLoader, Subset, random_split
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
 from torchvision.models import ResNet18_Weights, resnet18
@@ -38,10 +38,10 @@ class SkinCNN(nn.Module):
         self.backbone = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
         feats = self.backbone.fc.in_features
         self.backbone.fc = nn.Sequential(
-            nn.Dropout(0.4),
+            nn.Dropout(0.3),
             nn.Linear(feats, 256),
             nn.ReLU(),
-            nn.Dropout(0.3),
+            nn.Dropout(0.2),
             nn.Linear(256, num_classes),
         )
 
@@ -55,16 +55,18 @@ def train(
     batch_size=16,
     lr=1e-4,
     weight_decay=1e-4,
-    patience=10,
+    patience=20,
     save_path=WEIGHTS,
 ):
+    # Tuned for highest overall val accuracy (not rare-class fairness).
     dev = pick_device()
     train_tf = transforms.Compose([
-        transforms.Resize((SIZE, SIZE)),
+        transforms.Resize(256),
+        transforms.RandomResizedCrop(SIZE, scale=(0.7, 1.0)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
         transforms.RandomRotation(20),
-        transforms.ColorJitter(0.25, 0.25, 0.25, 0.05),
+        transforms.ColorJitter(0.2, 0.2, 0.2, 0.05),
         transforms.ToTensor(),
         transforms.Normalize(MEAN, STD),
     ])
@@ -87,29 +89,24 @@ def train(
         val_split.indices,
     )
 
-    train_labels = torch.tensor([full.targets[i] for i in train_ds.indices])
-    counts = torch.bincount(train_labels, minlength=n_cls).float()
-    class_weights = (counts.sum() / (counts.clamp(min=1) * n_cls)).to(dev)
-    crit = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=0.05)
-
-    # Oversample rare classes so batches aren't flooded by nevi.
-    sample_weights = (1.0 / counts.clamp(min=1))[train_labels]
-    sampler = WeightedRandomSampler(
-        weights=sample_weights,
-        num_samples=len(sample_weights),
-        replacement=True,
-    )
+    counts = torch.bincount(
+        torch.tensor([full.targets[i] for i in train_ds.indices]),
+        minlength=n_cls,
+    ).float()
+    # Mild class weights — help rare classes a little without hurting overall %.
+    class_weights = (counts.sum() / (counts.clamp(min=1) * n_cls)).sqrt().to(dev)
+    crit = nn.CrossEntropyLoss(weight=class_weights)
 
     model = SkinCNN(n_cls).to(dev)
     opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-    train_loader = DataLoader(train_ds, batch_size=batch_size, sampler=sampler)
+    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=batch_size)
 
     save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
     best, stale = 0.0, 0
     print(f"device={dev} classes={n_cls} train={len(train_ds)} val={n_val}")
-    print("class counts:", {name: int(counts[i]) for name, i in full.class_to_idx.items()})
 
     for epoch in range(1, epochs + 1):
         model.train()
@@ -126,6 +123,7 @@ def train(
             n += x.size(0)
         tr_loss /= n
         tr_acc = tr_ok / n * 100
+        sched.step()
 
         model.eval()
         va_loss, va_ok, n = 0.0, 0, 0
