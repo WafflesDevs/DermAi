@@ -147,36 +147,6 @@
       color: var(--accent-dark);
     }
 
-    .prediction span {
-      font-weight: 600;
-      color: var(--accent);
-    }
-
-    .chances {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-    }
-
-    .chances li {
-      display: flex;
-      justify-content: space-between;
-      gap: 1rem;
-      padding: 0.55rem 0;
-      border-top: 1px solid var(--line);
-      font-size: 0.98rem;
-    }
-
-    .chances li:first-child {
-      border-top: none;
-      font-weight: 600;
-    }
-
-    .pct {
-      font-variant-numeric: tabular-nums;
-      color: var(--accent-dark);
-    }
-
     footer {
       margin-top: 2.5rem;
       padding-top: 1rem;
@@ -190,7 +160,7 @@
 <body>
   <main>
     <h1>SkinNN</h1>
-    <p class="tagline">Upload a dermoscopic lesion photo to see predicted class chances.</p>
+    <p class="tagline">Upload a dermoscopic lesion photo to see the predicted class.</p>
 
     <div class="panel">
       <label class="file" for="photo">
@@ -208,7 +178,6 @@
     <section id="result" aria-live="polite">
       <h2>Predicted</h2>
       <p class="prediction" id="prediction"></p>
-      <ul class="chances" id="chances"></ul>
     </section>
 
     <footer>
@@ -224,7 +193,6 @@
     const status = document.getElementById("status");
     const result = document.getElementById("result");
     const prediction = document.getElementById("prediction");
-    const chances = document.getElementById("chances");
 
     let selectedFile = null;
 
@@ -261,18 +229,7 @@
           throw new Error(data.detail || "Prediction failed");
         }
 
-        prediction.innerHTML =
-          data.class + ' <span>(' + data.confidence + '%)</span>';
-
-        const ranked = Object.entries(data.probabilities)
-          .sort((a, b) => b[1] - a[1]);
-
-        chances.innerHTML = ranked
-          .map(([name, pct]) =>
-            "<li><span>" + name + '</span><span class="pct">' + pct + "%</span></li>"
-          )
-          .join("");
-
+        prediction.textContent = data.class;
         result.style.display = "block";
         status.textContent = "Done";
       } catch (err) {

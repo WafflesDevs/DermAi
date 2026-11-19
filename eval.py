@@ -88,14 +88,9 @@ def predict(image, weights_path=WEIGHTS):
 
 
 
-def as_percents(result):
+def as_answer(result):
     return {
         "class": result["class"],
-        "confidence": round(result["confidence"] * 100, 1),
-        "probabilities": {
-            name: round(prob * 100, 1)
-            for name, prob in result["probabilities"].items()
-        },
         "disclaimer": DISCLAIMER,
     }
 
@@ -117,7 +112,7 @@ async def api_predict(file: UploadFile = File(...)):
     except Exception as exc:
         raise HTTPException(status_code=400, detail="Invalid image upload") from exc
 
-    return as_percents(predict(image))
+    return as_answer(predict(image))
 
 
 @app.get("/")
@@ -130,12 +125,8 @@ if STATIC.is_dir():
 
 
 def run_cli(image_path):
-    result = as_percents(predict(image_path))
-    print(f"Predicted: {result['class']} ({result['confidence']}%)")
-    print("Chances:")
-    ranked = sorted(result["probabilities"].items(), key=lambda item: item[1], reverse=True)
-    for name, pct in ranked:
-        print(f"  {name}: {pct}%")
+    result = as_answer(predict(image_path))
+    print(f"Predicted: {result['class']}")
     print(DISCLAIMER)
 
 
