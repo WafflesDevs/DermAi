@@ -4,16 +4,22 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SkinNN</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #e8f0ec;
-      --bg-deep: #d5e4db;
-      --ink: #1c2e28;
-      --muted: #4a635a;
-      --accent: #2a7a6a;
-      --accent-dark: #1f5c50;
-      --panel: #f7fbf8;
-      --line: #b7cdc3;
+      --ink: #141415;
+      --ink-soft: #3a3a3c;
+      --muted: #6b6b70;
+      --line: #e2e2e6;
+      --line-strong: #c8c8ce;
+      --surface: #ffffff;
+      --surface-soft: #f3f3f5;
+      --bg-0: #f7f7f8;
+      --bg-1: #ececef;
+      --shadow: 0 18px 40px -28px rgba(20, 20, 21, 0.45);
+      --radius: 4px;
     }
 
     * { box-sizing: border-box; }
@@ -21,61 +27,107 @@
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-family: "Outfit", sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(ellipse at top left, #f2f8f4 0%, transparent 55%),
-        linear-gradient(160deg, var(--bg), var(--bg-deep));
+        radial-gradient(120% 80% at 50% -10%, #ffffff 0%, transparent 55%),
+        radial-gradient(90% 60% at 100% 100%, #e8e8ec 0%, transparent 50%),
+        linear-gradient(165deg, var(--bg-0), var(--bg-1));
+      -webkit-font-smoothing: antialiased;
     }
 
     main {
-      max-width: 640px;
+      width: min(560px, calc(100% - 2.5rem));
       margin: 0 auto;
-      padding: 3rem 1.25rem 4rem;
+      padding: 4.5rem 0 3.5rem;
+      animation: rise 0.7s ease both;
     }
 
-    h1 {
-      margin: 0 0 0.35rem;
-      font-size: clamp(2.4rem, 6vw, 3.2rem);
-      letter-spacing: -0.03em;
-      color: var(--accent-dark);
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .brand {
+      margin-bottom: 2.75rem;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: clamp(2.8rem, 9vw, 3.6rem);
+      font-weight: 700;
+      letter-spacing: -0.055em;
+      line-height: 0.95;
+      color: var(--ink);
     }
 
     .tagline {
-      margin: 0 0 2rem;
+      margin: 0.65rem 0 0;
+      max-width: 28ch;
       color: var(--muted);
       font-size: 1.05rem;
+      font-weight: 400;
       line-height: 1.45;
+      letter-spacing: -0.01em;
     }
 
     .panel {
-      background: var(--panel);
+      background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 1.25rem;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.15rem;
+      animation: rise 0.9s ease 0.08s both;
     }
 
     label.file {
-      display: block;
+      display: grid;
+      place-items: center;
+      gap: 0.35rem;
+      min-height: 168px;
       cursor: pointer;
-      border: 1.5px dashed var(--accent);
-      border-radius: 10px;
+      border: 1px dashed var(--line-strong);
+      border-radius: var(--radius);
       padding: 1.5rem 1rem;
       text-align: center;
       color: var(--muted);
-      background: #eef6f2;
-      transition: background 0.15s ease, border-color 0.15s ease;
+      background:
+        linear-gradient(180deg, var(--surface-soft), #fafafa);
+      transition:
+        background 0.2s ease,
+        border-color 0.2s ease,
+        transform 0.2s ease;
     }
 
     label.file:hover {
-      background: #e4f1eb;
-      border-color: var(--accent-dark);
+      border-color: var(--ink);
+      background: #f0f0f2;
+      transform: translateY(-1px);
+    }
+
+    label.file.has-file {
+      min-height: auto;
+      padding: 0.85rem;
+      background: var(--surface);
+      border-style: solid;
+      border-color: var(--line);
     }
 
     label.file strong {
       display: block;
       color: var(--ink);
-      margin-bottom: 0.35rem;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    label.file span.hint {
+      font-size: 0.9rem;
     }
 
     input[type="file"] {
@@ -88,87 +140,119 @@
 
     .preview {
       display: none;
-      margin-top: 1rem;
-      max-width: 100%;
+      width: 100%;
       max-height: 280px;
-      border-radius: 8px;
+      border-radius: 2px;
       object-fit: contain;
+      background: var(--surface-soft);
     }
 
     .actions {
       margin-top: 1rem;
       display: flex;
-      gap: 0.75rem;
+      gap: 0.85rem;
       align-items: center;
     }
 
     button {
       appearance: none;
       border: none;
-      border-radius: 8px;
-      padding: 0.7rem 1.2rem;
-      font-size: 1rem;
+      border-radius: var(--radius);
+      padding: 0.78rem 1.35rem;
+      font-family: inherit;
+      font-size: 0.95rem;
       font-weight: 600;
+      letter-spacing: -0.02em;
       color: #fff;
-      background: var(--accent);
+      background: var(--ink);
       cursor: pointer;
+      transition: background 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
     }
 
     button:hover:not(:disabled) {
-      background: var(--accent-dark);
+      background: #2a2a2c;
+      transform: translateY(-1px);
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(0);
     }
 
     button:disabled {
-      opacity: 0.55;
+      opacity: 0.38;
       cursor: not-allowed;
     }
 
     .status {
       color: var(--muted);
-      font-size: 0.95rem;
+      font-size: 0.9rem;
+      letter-spacing: -0.01em;
     }
 
     #result {
       display: none;
-      margin-top: 1.5rem;
+      margin-top: 1.25rem;
+      padding: 1.15rem 1.2rem;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      animation: fade-in 0.35s ease both;
     }
 
-    #result h2 {
-      margin: 0 0 0.25rem;
-      font-size: 1.15rem;
-      font-weight: 600;
+    #result[data-visible="true"] {
+      display: block;
+    }
+
+    #result .label {
+      margin: 0 0 0.35rem;
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
       color: var(--muted);
     }
 
     .prediction {
-      margin: 0 0 1.25rem;
-      font-size: clamp(1.5rem, 4vw, 1.9rem);
-      font-weight: 700;
-      color: var(--accent-dark);
+      margin: 0;
+      font-size: clamp(1.45rem, 4vw, 1.85rem);
+      font-weight: 600;
+      letter-spacing: -0.035em;
+      color: var(--ink);
+      line-height: 1.2;
     }
 
     footer {
-      margin-top: 2.5rem;
-      padding-top: 1rem;
+      margin-top: 2.75rem;
+      padding-top: 1.15rem;
       border-top: 1px solid var(--line);
       color: var(--muted);
-      font-size: 0.88rem;
-      line-height: 1.5;
+      font-size: 0.84rem;
+      line-height: 1.55;
+      letter-spacing: -0.01em;
+      animation: rise 1s ease 0.12s both;
+    }
+
+    @media (max-width: 480px) {
+      main { width: min(100%, calc(100% - 1.5rem)); padding-top: 3rem; }
+      .actions { flex-wrap: wrap; }
     }
   </style>
 </head>
 <body>
   <main>
-    <h1>SkinNN</h1>
-    <p class="tagline">Upload a dermoscopic lesion photo to see the predicted class.</p>
+    <header class="brand">
+      <h1>SkinNN</h1>
+      <p class="tagline">Upload a dermoscopic lesion photo to see the predicted class.</p>
+    </header>
 
     <div class="panel">
-      <label class="file" for="photo">
-        <strong>Choose a photo</strong>
-        JPG or PNG works best
+      <label class="file" for="photo" id="dropzone">
+        <strong id="drop-title">Choose a photo</strong>
+        <span class="hint" id="drop-hint">JPG or PNG works best</span>
+        <img id="preview" class="preview" alt="Selected photo preview" />
       </label>
       <input id="photo" type="file" accept="image/*" />
-      <img id="preview" class="preview" alt="Selected photo preview" />
       <div class="actions">
         <button id="analyze" type="button" disabled>Analyze</button>
         <span id="status" class="status"></span>
@@ -176,7 +260,7 @@
     </div>
 
     <section id="result" aria-live="polite">
-      <h2>Predicted</h2>
+      <p class="label">Predicted</p>
       <p class="prediction" id="prediction"></p>
     </section>
 
@@ -189,27 +273,55 @@
   <script>
     const photo = document.getElementById("photo");
     const preview = document.getElementById("preview");
+    const dropzone = document.getElementById("dropzone");
+    const dropTitle = document.getElementById("drop-title");
+    const dropHint = document.getElementById("drop-hint");
     const analyze = document.getElementById("analyze");
     const status = document.getElementById("status");
     const result = document.getElementById("result");
     const prediction = document.getElementById("prediction");
 
     let selectedFile = null;
+    let previewUrl = null;
+
+    function setResultVisible(visible) {
+      result.dataset.visible = visible ? "true" : "false";
+      if (!visible) result.style.display = "none";
+      else result.style.display = "block";
+    }
+
+    function showPreview(file) {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = URL.createObjectURL(file);
+      preview.src = previewUrl;
+      preview.style.display = "block";
+      dropTitle.style.display = "none";
+      dropHint.style.display = "none";
+      dropzone.classList.add("has-file");
+    }
+
+    function clearPreview() {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = null;
+      preview.removeAttribute("src");
+      preview.style.display = "none";
+      dropTitle.style.display = "";
+      dropHint.style.display = "";
+      dropzone.classList.remove("has-file");
+    }
 
     photo.addEventListener("change", () => {
       selectedFile = photo.files[0] || null;
       analyze.disabled = !selectedFile;
       status.textContent = "";
-      result.style.display = "none";
+      setResultVisible(false);
 
       if (!selectedFile) {
-        preview.style.display = "none";
-        preview.removeAttribute("src");
+        clearPreview();
         return;
       }
 
-      preview.src = URL.createObjectURL(selectedFile);
-      preview.style.display = "block";
+      showPreview(selectedFile);
     });
 
     analyze.addEventListener("click", async () => {
@@ -217,7 +329,7 @@
 
       analyze.disabled = true;
       status.textContent = "Analyzing…";
-      result.style.display = "none";
+      setResultVisible(false);
 
       const body = new FormData();
       body.append("file", selectedFile);
@@ -230,7 +342,7 @@
         }
 
         prediction.textContent = data.class;
-        result.style.display = "block";
+        setResultVisible(true);
         status.textContent = "Done";
       } catch (err) {
         status.textContent = err.message || "Something went wrong";
